@@ -1,10 +1,11 @@
 import os
 import requests
 
+# Secrets'dan Telegram kalitlarini olish
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 
-# 12 ta viloyat markazlari va Nukus
+# 12 ta viloyat markazi va Qoraqalpog'iston (Nukus)
 CITIES = {
     "Tashkent": "Toshkent",
     "Samarkand": "Samarqand",
@@ -26,8 +27,8 @@ def get_weather():
     weather_text = "🌤 **BUGUNGI OB-HAVO MA'LUMOTLARI:**\n\n"
     for city_en, city_uz in CITIES.items():
         try:
-            # wttr.in orqali ob-havo va haroratni olish
-            url = f"https://wttr.in/{city_en}?format=%c+%t"
+            # &m parametri haroratni Fahrenheit emas, Selsiy (°C) da beradi
+            url = f"https://wttr.in/{city_en}?format=%c+%t&m"
             res = requests.get(url, timeout=5)
             if res.status_code == 200:
                 weather_text += f"📍 **{city_uz}:** {res.text.strip()}\n"
@@ -37,9 +38,11 @@ def get_weather():
 
 
 def get_rates():
+    # O'zbekiston Markaziy Banki API
     url = "https://cbu.uz/uz/arkhiv-kursov-valyut/json/"
     response = requests.get(url).json()
 
+    # Valyutalarni ajratib olish
     usd = next(item for item in response if item["Ccy"] == "USD")
     eur = next(item for item in response if item["Ccy"] == "EUR")
     rub = next(item for item in response if item["Ccy"] == "RUB")
@@ -54,10 +57,10 @@ def get_rates():
 
 
 def send_telegram():
-    # Ikkala ma'lumotni bitta xabarga biriktirish
     rates = get_rates()
     weather = get_weather()
 
+    # Ma'lumotlarni bitta xabarga birlashtirish
     full_message = f"{rates}\n➖➖➖➖➖➖➖➖➖\n\n{weather}"
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -67,7 +70,11 @@ def send_telegram():
         "parse_mode": "Markdown",
     }
 
-    requests.post(url, json=payload)
+    res = requests.post(url, json=payload)
+    if res.status_code == 200:
+        print("Xabar muvaffaqiyatli yuborildi!")
+    else:
+        print(f"Xatolik yuz berdi: {res.text}")
 
 
 if __name__ == "__main__":
