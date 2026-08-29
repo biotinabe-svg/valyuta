@@ -1,48 +1,49 @@
 import os
 import requests
 
-# Secrets'dan Telegram kalitlarini olish
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 
 # 12 ta viloyat markazi va Qoraqalpog'iston (Nukus)
 CITIES = {
-    "Tashkent": "Toshkent",
-    "Samarkand": "Samarqand",
-    "Bukhara": "Buxoro",
-    "Andijan": "Andijon",
-    "Fergana": "Farg'ona",
-    "Namangan": "Namangan",
-    "Qarshi": "Qarshi",
-    "Termez": "Termiz",
-    "Navoiy": "Navoiy",
-    "Jizzakh": "Jizzax",
-    "Guliston": "Guliston",
-    "Urgench": "Urganch",
-    "Nukus": "Nukus",
+    "Toshkent": (41.2995, 69.2401),
+    "Samarqand": (39.6542, 66.9597),
+    "Buxoro": (39.7747, 64.4286),
+    "Andijon": (40.7821, 72.3442),
+    "Farg'ona": (40.3864, 71.7864),
+    "Namangan": (40.9983, 71.6726),
+    "Qarshi": (38.8605, 65.7899),
+    "Termiz": (37.2242, 67.2783),
+    "Navoiy": (40.0844, 65.3792),
+    "Jizzax": (40.1158, 67.8422),
+    "Guliston": (40.4897, 68.7842),
+    "Urganch": (41.5503, 60.6317),
+    "Nukus": (42.4603, 59.6166),
 }
 
 
 def get_weather():
-    weather_text = "🌤 **BUGUNGI OB-HAVO MA'LUMOTLARI:**\n\n"
-    for city_en, city_uz in CITIES.items():
+    weather_text = "🌤 **BUGUNGI KUTILAYOTGAN OB-HAVO (Min / Max):**\n\n"
+
+    for city_name, (lat, lon) in CITIES.items():
         try:
-            # &m parametri haroratni Fahrenheit emas, Selsiy (°C) da beradi
-            url = f"https://wttr.in/{city_en}?format=%c+%t&m"
-            res = requests.get(url, timeout=5)
-            if res.status_code == 200:
-                weather_text += f"📍 **{city_uz}:** {res.text.strip()}\n"
+            url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
+            res = requests.get(url, timeout=5).json()
+
+            min_temp = round(res["daily"]["temperature_2m_min"][0])
+            max_temp = round(res["daily"]["temperature_2m_max"][0])
+
+            weather_text += f"📍 **{city_name}:** {min_temp}°C ... {max_temp}°C\n"
         except Exception:
-            weather_text += f"📍 **{city_uz}:** Noma'lum\n"
+            weather_text += f"📍 **{city_name}:** Ma'lumot olinmadi\n"
+
     return weather_text
 
 
 def get_rates():
-    # O'zbekiston Markaziy Banki API
     url = "https://cbu.uz/uz/arkhiv-kursov-valyut/json/"
     response = requests.get(url).json()
 
-    # Valyutalarni ajratib olish
     usd = next(item for item in response if item["Ccy"] == "USD")
     eur = next(item for item in response if item["Ccy"] == "EUR")
     rub = next(item for item in response if item["Ccy"] == "RUB")
@@ -60,7 +61,6 @@ def send_telegram():
     rates = get_rates()
     weather = get_weather()
 
-    # Ma'lumotlarni bitta xabarga birlashtirish
     full_message = f"{rates}\n➖➖➖➖➖➖➖➖➖\n\n{weather}"
 
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -70,11 +70,7 @@ def send_telegram():
         "parse_mode": "Markdown",
     }
 
-    res = requests.post(url, json=payload)
-    if res.status_code == 200:
-        print("Xabar muvaffaqiyatli yuborildi!")
-    else:
-        print(f"Xatolik yuz berdi: {res.text}")
+    requests.post(url, json=payload)
 
 
 if __name__ == "__main__":
