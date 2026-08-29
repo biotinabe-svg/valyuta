@@ -1,10 +1,10 @@
-name: Send Daily Exchange Rates
+name: Send Daily Exchange Rates and Weather
 
 on:
   schedule:
-    # Har kuni Toshkent vaqti bilan 09:00 da (UTC 04:00) ishlaydi
-    - cron: '0 4 * * *'
-  workflow_dispatch: # GitHub'da tugmani bosib qo'lda ham yuborish imkoni
+    # Har kuni Toshkent vaqti bilan 10:00 da (UTC 05:00) ishlaydi
+    - cron: '0 5 * * *'
+  workflow_dispatch:
 
 jobs:
   send-rates:
