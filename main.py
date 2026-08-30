@@ -1,10 +1,13 @@
 import os
 import requests
+import time
+from datetime import datetime
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-CHANNEL_ID = os.getenv("CHANNEL_ID")
+# ----------------- SOZLAMALAR -----------------
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8857142678:AAHGFzU_z80GM7Lk42b2ZMX69GLr04D7ErI")
+WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
+CHANNEL_ID = "@annapida"
 
-# 12 ta viloyat markazi va Qoraqalpog'iston (Nukus)
 CITIES = {
     "Toshkent": (41.2995, 69.2401),
     "Samarqand": (39.6542, 66.9597),
@@ -21,57 +24,107 @@ CITIES = {
     "Nukus": (42.4603, 59.6166),
 }
 
+WEEKDAYS = {
+    0: "Dushanba", 1: "Seshanba", 2: "Chorshanba",
+    3: "Payshanba", 4: "Juma", 5: "Shanba", 6: "Yakshanba"
+}
 
+CURRENCY_EMOJIS = {
+    "USD": "🇺🇸 1 USD",
+    "EUR": "🇪🇺 1 EUR",
+    "RUB": "🇷🇺 1 RUB",
+    "TRY": "🇹🇷 1 TRY"
+}
+
+# ----------------- OB-HAVO OLISH (MIN / MAX BILAN) -----------------
 def get_weather():
-    weather_text = "🌤 **BUGUNGI KUTILAYOTGAN OB-HAVO (Min / Max):**\n\n"
-
-    for city_name, (lat, lon) in CITIES.items():
+    text = "🌤 **BUGUNGI OB-HAVO MA'LUMOTLARI**\n\n"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    
+    for city, (lat, lon) in CITIES.items():
+        url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={WEATHER_API_KEY}&units=metric&lang=uz"
         try:
-            url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
-            res = requests.get(url, timeout=5).json()
-
-            min_temp = round(res["daily"]["temperature_2m_min"][0])
-            max_temp = round(res["daily"]["temperature_2m_max"][0])
-
-            weather_text += f"📍 **{city_name}:** {min_temp}°C ... {max_temp}°C\n"
+            res = requests.get(url, headers=headers, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                temp_min = round(data["main"]["temp_min"])
+                temp_max = round(data["main"]["temp_max"])
+                desc = data["weather"][0]["description"].capitalize()
+                
+                # Agar min va max bir xil bo'lsa, tushunarli chiqishi uchun
+                if temp_min == temp_max:
+                    text += f"📍 **{city}**: {temp_max}°C, {desc}\n"
+                else:
+                    text += f"📍 **{city}**: {temp_min}°C...{temp_max}°C, {desc}\n"
+            else:
+                text += f"📍 **{city}**: Ma'lumot olinmadi\n"
         except Exception:
-            weather_text += f"📍 **{city_name}:** Ma'lumot olinmadi\n"
+            text += f"📍 **{city}**: Ulanishda xatolik\n"
+        
+        # OpenWeather API limitiga tushmaslik uchun delay
+        time.sleep(0.8)
+        
+    return text
 
-    return weather_text
-
-
-def get_rates():
+# ----------------- VALYUTA KURSI OLISH -----------------
+def get_currency():
     url = "https://cbu.uz/uz/arkhiv-kursov-valyut/json/"
-    response = requests.get(url).json()
+    text = "\n💱 **MARKAZIY BANK VALYUTA KURSLARI**\n\n"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    
+    target_order = ["USD", "EUR", "RUB", "TRY"]
+    rates_dict = {}
+    
+    try:
+        res = requests.get(url, headers=headers, timeout=8, verify=False)
+        if res.status_code == 200:
+            data = res.json()
+            for item in data:
+                ccy = item.get("Ccy")
+                if ccy in target_order:
+                    rate = float(item.get("Rate", 0))
+                    formatted_rate = f"{rate:,.2f}".replace(",", " ").replace(".00", "")
+                    rates_dict[ccy] = formatted_rate
+            
+            for ccy in target_order:
+                if ccy in rates_dict:
+                    label = CURRENCY_EMOJIS.get(ccy, f"🔹 1 {ccy}")
+                    text += f"{label} = **{rates_dict[ccy]}** so'm\n"
+        else:
+            text += "Valyuta kurslarini olishda xatolik yuz berdi.\n"
+    except Exception:
+        text += "Valyuta serveriga bog'lanishda xatolik yuz berdi.\n"
+        
+    return text
 
-    usd = next(item for item in response if item["Ccy"] == "USD")
-    eur = next(item for item in response if item["Ccy"] == "EUR")
-    rub = next(item for item in response if item["Ccy"] == "RUB")
-
-    rates_text = (
-        "📈 **BUGUNGI VALYUTA KURSLARI:**\n\n"
-        f"🇺🇸 1 USD = {usd['Rate']} so'm ({usd['Diff']} so'm)\n"
-        f"🇪🇺 1 EUR = {eur['Rate']} so'm ({eur['Diff']} so'm)\n"
-        f"🇷🇺 1 RUB = {rub['Rate']} so'm ({rub['Diff']} so'm)\n"
-    )
-    return rates_text
-
-
-def send_telegram():
-    rates = get_rates()
-    weather = get_weather()
-
-    full_message = f"{rates}\n➖➖➖➖➖➖➖➖➖\n\n{weather}"
-
+# ----------------- TELEGRAMGA YUBORISH -----------------
+def send_to_telegram(message_text):
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": CHANNEL_ID,
-        "text": full_message,
+        "text": message_text,
         "parse_mode": "Markdown",
+        "disable_web_page_preview": True
     }
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        if response.status_code == 200:
+            print("Post kanala muvaffaqiyatli yuborildi!")
+        else:
+            print(f"Telegramga yuborishda xatolik: {response.text}")
+    except Exception as e:
+        print(f"Telegram API ulanishda xatolik: {e}")
 
-    requests.post(url, json=payload)
-
-
+# ----------------- ASOSIY QISM -----------------
 if __name__ == "__main__":
-    send_telegram()
+    now = datetime.now()
+    date_str = now.strftime("%d.%m.%Y")
+    weekday_str = WEEKDAYS[now.weekday()]
+    
+    header = f"📅 **{date_str} - {weekday_str}**\n\n"
+    
+    weather_info = get_weather()
+    currency_info = get_currency()
+    
+    full_text = f"{header}{weather_info}{currency_info}"
+    send_to_telegram(full_text)
