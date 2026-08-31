@@ -7,6 +7,7 @@ from datetime import datetime
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8857142678:AAHGFzU_z80GM7Lk42b2ZMX69GLr04D7ErI")
 CHANNEL_ID = "@annapida"
 
+# 12 ta viloyat markazi va Qoraqalpog'iston (Nukus) koordinatalari
 CITIES = {
     "Toshkent": (41.2995, 69.2401),
     "Samarqand": (39.6542, 66.9597),
@@ -35,31 +36,37 @@ CURRENCY_EMOJIS = {
     "TRY": "🇹🇷 1 TRY"
 }
 
-# ----------------- OB-HAVO OLISH (OPEN-METEO / KALITSIZ) -----------------
+# ----------------- OB-HAVO OLISH (OPTIMALLASHTIRILGAN) -----------------
 def get_weather():
     text = "🌤 **BUGUNGI OB-HAVO MA'LUMOTLARI**\n\n"
     headers = {"User-Agent": "Mozilla/5.0"}
     
     for city, (lat, lon) in CITIES.items():
-        # Open-Meteo bepul API (API Key talab qilmaydi)
         url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
-        try:
-            res = requests.get(url, headers=headers, timeout=5)
-            if res.status_code == 200:
-                data = res.json()
-                temp_min = round(data["daily"]["temperature_2m_min"][0])
-                temp_max = round(data["daily"]["temperature_2m_max"][0])
-                
-                if temp_min == temp_max:
-                    text += f"📍 **{city}**: {temp_max}°C\n"
-                else:
-                    text += f"📍 **{city}**: {temp_min}°C ... {temp_max}°C\n"
-            else:
-                text += f"📍 **{city}**: Ma'lumot olinmadi\n"
-        except Exception:
-            text += f"📍 **{city}**: Ulanishda xatolik\n"
         
-        time.sleep(0.2)
+        # Tarmoq xatoliklarining oldini olish uchun 2 marta qayta urinish
+        success = False
+        for attempt in range(2):
+            try:
+                res = requests.get(url, headers=headers, timeout=10)
+                if res.status_code == 200:
+                    data = res.json()
+                    temp_min = round(data["daily"]["temperature_2m_min"][0])
+                    temp_max = round(data["daily"]["temperature_2m_max"][0])
+                    
+                    if temp_min == temp_max:
+                        text += f"📍 **{city}**: {temp_max}°C\n"
+                    else:
+                        text += f"📍 **{city}**: {temp_min}°C ... {temp_max}°C\n"
+                    success = True
+                    break
+            except Exception:
+                time.sleep(1)  # Xatolik bo'lsa 1 soniya kutib qayta urinadi
+                
+        if not success:
+            text += f"📍 **{city}**: Ma'lumot olinmadi\n"
+        
+        time.sleep(0.05)
         
     return text
 
@@ -73,7 +80,7 @@ def get_currency():
     rates_dict = {}
     
     try:
-        res = requests.get(url, headers=headers, timeout=8, verify=False)
+        res = requests.get(url, headers=headers, timeout=10, verify=False)
         if res.status_code == 200:
             data = res.json()
             for item in data:
