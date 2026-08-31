@@ -2,7 +2,7 @@ name: Send Daily Exchange Rates and Weather
 
 on:
   schedule:
-    # Har kuni Toshkent vaqti bilan 10:00 da (UTC 05:00) ishlaydi
+    # Har kuni Toshkent vaqti bilan soat 10:00 da (UTC 05:00) ishlaydi
     - cron: '0 5 * * *'
   workflow_dispatch:
 
@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.x'
 
