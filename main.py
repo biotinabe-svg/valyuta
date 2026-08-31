@@ -5,7 +5,6 @@ from datetime import datetime
 
 # ----------------- SOZLAMALAR -----------------
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8857142678:AAHGFzU_z80GM7Lk42b2ZMX69GLr04D7ErI")
-WEATHER_API_KEY = os.getenv("WEATHER_API_KEY")
 CHANNEL_ID = "@annapida"
 
 CITIES = {
@@ -36,33 +35,31 @@ CURRENCY_EMOJIS = {
     "TRY": "🇹🇷 1 TRY"
 }
 
-# ----------------- OB-HAVO OLISH (MIN / MAX BILAN) -----------------
+# ----------------- OB-HAVO OLISH (OPEN-METEO / KALITSIZ) -----------------
 def get_weather():
     text = "🌤 **BUGUNGI OB-HAVO MA'LUMOTLARI**\n\n"
     headers = {"User-Agent": "Mozilla/5.0"}
     
     for city, (lat, lon) in CITIES.items():
-        url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={WEATHER_API_KEY}&units=metric&lang=uz"
+        # Open-Meteo bepul API (API Key talab qilmaydi)
+        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&daily=temperature_2m_max,temperature_2m_min&timezone=auto"
         try:
             res = requests.get(url, headers=headers, timeout=5)
             if res.status_code == 200:
                 data = res.json()
-                temp_min = round(data["main"]["temp_min"])
-                temp_max = round(data["main"]["temp_max"])
-                desc = data["weather"][0]["description"].capitalize()
+                temp_min = round(data["daily"]["temperature_2m_min"][0])
+                temp_max = round(data["daily"]["temperature_2m_max"][0])
                 
-                # Agar min va max bir xil bo'lsa, tushunarli chiqishi uchun
                 if temp_min == temp_max:
-                    text += f"📍 **{city}**: {temp_max}°C, {desc}\n"
+                    text += f"📍 **{city}**: {temp_max}°C\n"
                 else:
-                    text += f"📍 **{city}**: {temp_min}°C...{temp_max}°C, {desc}\n"
+                    text += f"📍 **{city}**: {temp_min}°C ... {temp_max}°C\n"
             else:
                 text += f"📍 **{city}**: Ma'lumot olinmadi\n"
         except Exception:
             text += f"📍 **{city}**: Ulanishda xatolik\n"
         
-        # OpenWeather API limitiga tushmaslik uchun delay
-        time.sleep(0.8)
+        time.sleep(0.2)
         
     return text
 
